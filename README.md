@@ -1,44 +1,67 @@
-# La Norteñita — sitio web publicable
+# La Norteñita — Render Free + Supabase PostgreSQL
 
-Sitio web responsive en español, con identidad visual basada en el HERO y logotipo proporcionados.
+Esta versión reemplaza SQLite por PostgreSQL alojado en Supabase. Render solo ejecuta el servidor y sirve el sitio; todos los productos, pedidos, clientes, detalles de compra, sesiones administrativas y tokens privados se guardan en Supabase. No necesita disco persistente en Render.
 
-## Funcionalidades
-- Catálogo público de snacks, sin iniciar sesión.
-- Carrito y formulario obligatorio de nombre completo + teléfono/WhatsApp.
-- Registro de solicitudes en SQLite y descuento de inventario al enviar el pedido.
-- “Mis compras”: el comprador consulta sus pedidos mediante un token privado guardado en su navegador.
-- Administración protegida con usuario y contraseña: mantenimiento de productos y bandeja privada de pedidos.
-- Contacto del comprador por WhatsApp desde el panel.
-- Estados de pedido: Pendiente, Contactado, Confirmado, Preparando, Entregado y Cancelado.
-- Al cancelar una solicitud se devuelve el stock al inventario.
-- Diseño responsive y PWA instalable.
+## Paso A — Crear proyecto Supabase
+1. Entra a https://supabase.com/ y crea una cuenta.
+2. Crea un proyecto llamado `la-nortenita` y selecciona el plan Free.
+3. Guarda la contraseña de la base de datos de forma segura.
+4. Espera a que finalice la creación del proyecto.
+5. Abre **Connect** en el panel del proyecto.
+6. Selecciona **Connection string**, formato **URI** y **Session pooler**.
+7. Copia la URI. Sustituye el marcador de contraseña por la contraseña real de la base de datos. No la envíes por chat ni la subas a GitHub.
+8. El servidor crea las tablas automáticamente al arrancar por primera vez. El archivo `supabase/schema.sql` contiene el esquema para referencia.
 
-## Ejecutar localmente
-1. Requiere Node.js 20 o superior.
-2. Copia `.env.example` como `.env`.
-3. En `.env`, cambia `ADMIN_USER` y `ADMIN_PASSWORD`. La contraseña debe tener al menos 12 caracteres.
-4. Ejecuta `npm install`.
-5. Ejecuta `npm start`.
-6. Abre `http://localhost:3000`.
+## Paso B — Actualizar GitHub
+1. Descomprime este ZIP.
+2. Sube TODO el contenido de la carpeta `la-nortenita-web` a la raíz del repositorio GitHub, reemplazando los archivos de la versión SQLite.
+3. Comprueba que `render.yaml`, `server.js`, `package.json` y `public/` estén en la raíz.
+4. No subas `.env` ni la URI de Supabase. `.gitignore` excluye `.env`.
+5. Haz commit y push a la rama `main`.
 
-La base SQLite se crea en `data/lanortenita.sqlite` (o en la ruta indicada por `DB_PATH`). Se precargan tres productos de ejemplo la primera vez.
+## Paso C — Crear el servicio gratuito en Render
+1. Entra a https://dashboard.render.com/.
+2. Si el Blueprint anterior quedó configurado con Starter y disco, no lo reutilices sin corregirlo. Crea un Blueprint nuevo desde el repositorio actualizado o elimina el servicio anterior solo si confirmaste que no contiene datos que debas conservar.
+3. Haz clic en **New +** > **Blueprint**.
+4. Conecta GitHub y selecciona el repositorio actualizado y la rama `main`.
+5. Verifica que Blueprint Path sea `render.yaml`.
+6. Render debe mostrar un servicio web Node con plan **Free**. Este archivo no solicita tarjeta por disco ni define disco persistente.
+7. Cuando Render solicite variables secretas, completa:
+   - `ADMIN_USER`: por ejemplo `admin`.
+   - `ADMIN_PASSWORD`: contraseña propia y única, mínimo 12 caracteres.
+   - `SUPABASE_DB_URL`: URI completa del Session Pooler de Supabase.
+8. Haz clic en **Apply** o **Create Blueprint**.
 
-## Publicar en Render con base SQLite persistente
-1. Sube el contenido de esta carpeta a un repositorio privado de GitHub.
-2. En Render, crea un nuevo Blueprint desde ese repositorio; Render detectará `render.yaml`.
-3. Completa las variables `ADMIN_USER` y `ADMIN_PASSWORD` cuando Render las solicite.
-4. Despliega el servicio. El disco persistente está montado en `/var/data` y la BD queda en `/var/data/lanortenita.sqlite`.
-5. Usa el dominio HTTPS asignado. La PWA podrá instalarse desde el navegador del teléfono.
+## Paso D — Comprobar el despliegue
+1. Espera que el servicio quede en estado **Live**.
+2. Abre la URL HTTPS `https://<nombre-del-servicio>.onrender.com`.
+3. Comprueba que el catálogo cargue. Al inicio, si no había productos, el servidor agrega tres productos de muestra.
+4. Haz una compra de prueba con nombre y teléfono.
+5. Entra a Administración y comprueba que aparezca el pedido y el botón de WhatsApp.
+6. En Supabase > **Table Editor**, revisa las tablas `products`, `orders`, `order_items`, `order_access` y `admin_sessions`.
+7. Comprueba `https://<nombre-del-servicio>.onrender.com/health`; debe responder `{"status":"ok"}`.
 
-También puedes desplegar el Dockerfile en un VPS, siempre que montes un volumen persistente para `/app/data` o configures `DB_PATH`.
+## Variables de entorno
+En Render > servicio > **Environment** deben existir:
+- `NODE_ENV` = `production`
+- `ADMIN_USER` = tu usuario
+- `ADMIN_PASSWORD` = tu contraseña segura
+- `SUPABASE_DB_URL` = URI privada de Supabase
 
-## Seguridad y operación
-- No publiques ni compartas el archivo `.env`.
-- Cambia la contraseña de ejemplo antes del despliegue.
-- Las rutas de administración requieren sesión del servidor; ocultar la sección en la interfaz no es la única protección.
-- La cookie administrativa es HttpOnly, SameSite Strict y Secure en producción.
-- El acceso de login tiene limitación de intentos.
-- La consulta de “Mis compras” usa un token secreto; no compartas ese token.
-- El servidor debe permanecer activo y la base SQLite debe estar en disco persistente para conservar ventas y stock.
-- Haz copias de seguridad regulares del archivo SQLite.
-- Los pedidos son solicitudes de compra, no pagos en línea: el negocio debe contactar al cliente y confirmar la venta.
+Si modificas variables, guarda y vuelve a desplegar.
+
+## Límites de los planes gratuitos
+- Render Free suspende el servidor después de 15 minutos sin tráfico; el primer acceso posterior puede tardar cerca de un minuto mientras despierta.
+- Render Free tiene sistema de archivos efímero; esta versión no guarda datos allí.
+- Supabase Free incluye 500 MB por base de datos y puede pausar proyectos con muy poca actividad durante una semana.
+- Supabase Free no incluye backups automáticos. Exporta periódicamente los datos desde Supabase.
+- Es una configuración para pruebas, aprendizaje o un piloto pequeño; no es recomendable depender de ella para ventas importantes sin copias de seguridad y un plan de continuidad.
+- No hay pagos en línea: el pedido es una solicitud para que el negocio contacte al cliente y complete la venta.
+
+## Seguridad
+- Nunca compartas ni publiques `SUPABASE_DB_URL`.
+- No reutilices la contraseña de Supabase como contraseña del administrador.
+- La autenticación se valida en el servidor, con cookie HttpOnly, SameSite Strict y Secure en producción.
+- El inicio de sesión limita los intentos fallidos.
+- “Mis compras” usa un token privado aleatorio; el navegador que registró el pedido conserva ese token.
+- Haz copias de seguridad periódicas y prueba la restauración.

@@ -1,9 +1,12 @@
 services:
   - type: web
     name: la-nortenita-web
-    runtime: docker
-    plan: starter
-    healthCheckPath: /
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
@@ -11,9 +14,5 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      - key: DB_PATH
-        value: /var/data/lanortenita.sqlite
-    disk:
-      name: nortenita-data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: SUPABASE_DB_URL
+        sync: false
